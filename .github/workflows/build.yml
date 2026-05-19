@@ -1,59 +1,28 @@
-# Build badge: https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/build.yml/badge.svg
-# Add to README: [![Build](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/build.yml/badge.svg)](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/build.yml)
-
-name: Build
+name: Build Cliplite (Windows)
 
 on:
   push:
-    branches: [main, master]
-    tags: ['v*.*.*']
   pull_request:
-    branches: [main, master]
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
-
-      # WTL is not in the repo — download the GitHub mirror archive and cache it.
-      # If this version goes stale, update the tag at Win32-WTL/WTL releases.
-      - name: Cache WTL headers
-        id: cache-wtl
-        uses: actions/cache@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          path: third_party/wtl
-          key: wtl-10.0.10320
+          submodules: false
 
-      - name: Download WTL
-        if: steps.cache-wtl.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          $tag = "10.0.10320"
-          Invoke-WebRequest `
-            -Uri "https://github.com/Win32-WTL/WTL/archive/refs/tags/$tag.zip" `
-            -OutFile wtl.zip
-          Expand-Archive wtl.zip -DestinationPath third_party\_wtl_tmp
-          New-Item -ItemType Directory -Path third_party\wtl -Force | Out-Null
-          Move-Item "third_party\_wtl_tmp\WTL-$tag\Include" third_party\wtl\Include
-          Remove-Item third_party\_wtl_tmp, wtl.zip -Recurse -Force
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
 
-      - name: Set up MSVC (x64)
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      # Cache the FetchContent download of nlohmann/json.
-      - name: Cache CMake FetchContent deps
-        uses: actions/cache@v4
-        with:
-          path: build/_deps
-          key: cmake-deps-${{ hashFiles('CMakeLists.txt') }}
-          restore-keys: cmake-deps-
-
-      - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build
+          -G "Visual Studio 17 2022"
+          -A x64
+          -DCMAKE_CXX_STANDARD=20
 
       - name: Build
         run: cmake --build build --config Release
@@ -61,26 +30,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cliplite-windows-x64
-          path: build/cliplite.exe
-          retention-days: 30
-
-  # Runs only on version tags (e.g. v1.2.0).  Creates a GitHub Release and
-  # attaches the exe so users can download it from the Releases page.
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: cliplite-windows-x64
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: cliplite.exe
-          generate_release_notes: true
+          name: cliplite
+          path: build/Release/cliplite.exe
