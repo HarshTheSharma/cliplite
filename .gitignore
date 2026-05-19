@@ -7,9 +7,6 @@
 *.suo
 .vscode/
 
-# WTL — download manually, see build.bat header
-/third_party/wtl/
-
 # User config written at runtime
 cliplite-config.json
 
