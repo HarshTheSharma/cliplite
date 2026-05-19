@@ -8,6 +8,8 @@
 #include <shobjidl.h>
 #include <shellapi.h>
 #include <strsafe.h>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
 
 using Microsoft::WRL::ComPtr;
 
@@ -24,7 +26,7 @@ int App::Run(HINSTANCE) {
     if (!engine_->Initialize()) {
         MessageBoxW(nullptr,
             L"Failed to initialise the capture engine.\n"
-            L"A compatible GPU (D3D11 feature level 11.0) and Windows 10+ are required.",
+            L"Souions including attemping a relaunch or installing a new github release (HarshTheSharma/cliplite).",
             L"ClipLite", MB_OK | MB_ICONERROR);
         return 1;
     }
@@ -39,7 +41,12 @@ int App::Run(HINSTANCE) {
     tray_->onOpenSaveFolder = [this]()        { OnOpenSaveFolder(); };
     tray_->onOpenConfigFile = [this]()        { OnOpenConfigFile(); };
     tray_->onQuit           = [this]()        { OnQuit(); };
-    tray_->onHotkey         = [this]()        { engine_->RequestClipSave(); };
+    tray_->onHotkey         = [this]() {
+        PlaySoundW(MAKEINTRESOURCEW(IDR_CLIP_SOUND),
+           GetModuleHandle(nullptr),
+           SND_RESOURCE | SND_ASYNC);
+        engine_->RequestClipSave();
+    };
 
     if (!tray_->Create()) return 1;
     tray_hwnd_ = tray_->m_hWnd;

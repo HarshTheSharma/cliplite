@@ -4,6 +4,9 @@
 // Application icon — highest quality (256×256) used by taskbar and shell
 IDI_APPICON ICON "..\cliplite.ico"
 
+// Clip Sound - Used when clipping is triggered
+IDR_CLIP_SOUND WAV "..\\clip.wav"
+
 // ── Tray context menu ─────────────────────────────────────────────────────────
 IDR_TRAYMENU MENU
 BEGIN

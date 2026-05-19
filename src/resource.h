@@ -3,6 +3,9 @@
 // Icons
 #define IDI_APPICON                 101
 
+// Sounds
+#define IDR_CLIP_SOUND              102
+
 // Menus
 #define IDR_TRAYMENU                201
 
