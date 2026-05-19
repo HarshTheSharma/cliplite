@@ -2,7 +2,10 @@ name: Build Cliplite (Windows)
 
 on:
   push:
+    tags:
+      - "v*.*.*"
   pull_request:
+  push:
 
 jobs:
   build:
@@ -32,3 +35,24 @@ jobs:
         with:
           name: cliplite
           path: build/Release/cliplite.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cliplite
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Cliplite ${{ github.ref_name }}
+          files: cliplite.exe
+          generate_release_notes: true
