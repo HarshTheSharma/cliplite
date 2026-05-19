@@ -1,0 +1,18 @@
+# Build output
+/build/
+
+# Visual Studio / VS Code
+.vs/
+*.user
+*.suo
+.vscode/
+
+# WTL — download manually, see build.bat header
+/third_party/wtl/
+
+# User config written at runtime
+cliplite-config.json
+
+# Windows shell debris
+Thumbs.db
+Desktop.ini

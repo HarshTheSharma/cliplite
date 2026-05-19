@@ -1,0 +1,53 @@
+#include <windows.h>
+#include "resource.h"
+
+// Application icon — highest quality (256×256) used by taskbar and shell
+IDI_APPICON ICON "..\cliplite.ico"
+
+// ── Tray context menu ─────────────────────────────────────────────────────────
+IDR_TRAYMENU MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "Clip Duration"
+        BEGIN
+            MENUITEM "30 seconds",   4001
+            MENUITEM "60 seconds",   4002
+            MENUITEM "90 seconds",   4003
+            MENUITEM "2 minutes",    4004
+            MENUITEM "2.5 minutes",  4005
+            MENUITEM "3 minutes",    4006
+            MENUITEM "3.5 minutes",  4007
+            MENUITEM "4 minutes",    4008
+            MENUITEM "4.5 minutes",  4009
+            MENUITEM "5 minutes",    4010
+        END
+        MENUITEM "Save Location...",     ID_TRAY_SAVELOCATION
+        MENUITEM "Enable Microphone",    ID_TRAY_ENABLEMIC
+        MENUITEM "Change Hotkey...",     ID_TRAY_CHANGEHOTKEY
+        MENUITEM SEPARATOR
+        MENUITEM "Open Save Folder",     ID_TRAY_OPENSAVEFOLDER
+        MENUITEM "Open Config File",     ID_TRAY_OPENCONFIGFILE
+        MENUITEM "Start with Windows",   ID_TRAY_STARTWITHWINDOWS
+        MENUITEM SEPARATOR
+        MENUITEM "Quit",                 ID_TRAY_QUIT
+    END
+END
+
+// ── Hotkey capture dialog ─────────────────────────────────────────────────────
+IDD_HOTKEY_DIALOG DIALOGEX 0, 0, 260, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Change Hotkey"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Press a new key combination:",
+                    -1, 7, 8, 246, 10
+    LTEXT           "", IDC_HOTKEY_DISPLAY,
+                    7, 22, 188, 14, SS_SUNKEN | SS_LEFT
+    PUSHBUTTON      "Clear", IDC_HOTKEY_CLEAR,
+                    202, 22, 50, 14
+    DEFPUSHBUTTON   "OK",     IDOK,
+                    142, 60, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL,
+                    202, 60, 50, 14
+END
