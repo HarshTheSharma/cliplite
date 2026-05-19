@@ -15,9 +15,17 @@ static bool IsStartupEnabled() {
     HKEY hk;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_QUERY_VALUE, &hk) != ERROR_SUCCESS)
         return false;
-    bool found = RegQueryValueExW(hk, kRunName, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS;
+    wchar_t stored[MAX_PATH + 4]{};
+    DWORD size = sizeof(stored);
+    bool found = RegQueryValueExW(hk, kRunName, nullptr, nullptr,
+                                  reinterpret_cast<BYTE*>(stored), &size) == ERROR_SUCCESS;
     RegCloseKey(hk);
-    return found;
+    if (!found) return false;
+    // stale entry pointing to a different exe counts as disabled
+    wchar_t current[MAX_PATH];
+    GetModuleFileNameW(nullptr, current, MAX_PATH);
+    std::wstring expected = std::wstring(L"\"") + current + L"\"";
+    return _wcsicmp(stored, expected.c_str()) == 0;
 }
 
 static void SetStartup(bool enable) {

@@ -5,7 +5,7 @@
 IDI_APPICON ICON "..\cliplite.ico"
 
 // Clip Sound - Used when clipping is triggered
-IDR_CLIP_SOUND WAV "..\\cliplite.wav"
+IDR_CLIP_SOUND WAVE "..\\cliplite.wav"
 
 // ── Tray context menu ─────────────────────────────────────────────────────────
 IDR_TRAYMENU MENU
