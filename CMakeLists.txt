@@ -52,7 +52,6 @@ set(SOURCES
     src/EncoderThread.cpp
     src/TrayIcon.cpp
     src/HotkeyDialog.cpp
-    src/EventDetector.cpp
     resources/app.rc
 )
 
@@ -72,21 +71,6 @@ target_link_libraries(cliplite PRIVATE
     shell32 user32 gdi32 comctl32
     avrt uxtheme comdlg32 shlwapi advapi32
     winmm
-)
-
-# ── Deploy game configs alongside the executable ──────────────────────────────
-add_custom_command(TARGET cliplite POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/configs
-        $<TARGET_FILE_DIR:cliplite>/configs
-    COMMENT "Copying game configs to build output"
-)
-
-# Create assets/sounds so the user has a clear drop location for WAV files.
-add_custom_command(TARGET cliplite POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        $<TARGET_FILE_DIR:cliplite>/assets/sounds
-    COMMENT "Creating assets/sounds directory"
 )
 
 

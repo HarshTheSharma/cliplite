@@ -99,10 +99,23 @@ bool VideoCapture::CaptureFrame() {
     if (!pool) return true;
     const int W = pool->Width(), H = pool->Height();
 
-    // Trim ring buffer to the configured clip duration.
-    const size_t max_frames = (size_t)(engine_.GetConfig().duration_seconds * 30 + 30);
-    if (engine_.GetVideoRing().size() >= max_frames)
-        engine_.GetVideoRing().evict_oldest();
+    // Trim the ring to hold (duration + 2 s safety) of frames, measured by
+    // timestamp — not frame count. DXGI Desktop Duplication delivers frames
+    // at the desktop update rate (matches the monitor refresh during
+    // continuous on-screen change), so a fixed-FPS frame budget either
+    // under- or over-shoots the intended duration. Using timestamps keeps
+    // the window correct at 30, 60, 144 Hz, etc.
+    const uint64_t now_ts       = Timestamp100ns();
+    const uint64_t window_100ns =
+        (uint64_t)(engine_.GetConfig().duration_seconds + 2) * 10'000'000ULL;
+    while (engine_.GetVideoRing().size() > 1) {
+        uint64_t oldest_ts = 0;
+        bool got = engine_.GetVideoRing().with_oldest(
+            [&](const VideoFrame& f) { oldest_ts = f.timestamp_100ns; });
+        if (!got) break; // empty or snapshot in progress — retry next frame
+        if (now_ts - oldest_ts <= window_100ns) break;
+        if (!engine_.GetVideoRing().evict_oldest()) break;
+    }
 
     // Acquire one of the two readback staging textures.
     ID3D11Texture2D* staging = nullptr;

@@ -6,7 +6,6 @@
 #include <memory>
 #include <string>
 #include "Config.h"
-#include "EventDetector.h"
 
 class CaptureEngine;
 class TrayWindow;
@@ -40,7 +39,6 @@ private:
     Config                         cfg_;
     std::unique_ptr<CaptureEngine> engine_;
     std::unique_ptr<TrayWindow>    tray_;
-    std::unique_ptr<EventDetector> detector_;
 
     HWND tray_hwnd_   = nullptr;
     int  hotkey_id_   = 1; // ID passed to RegisterHotKey

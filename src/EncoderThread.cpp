@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 #include <filesystem>
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <vector>
 #include <string>
@@ -66,10 +67,26 @@ static bool WriteClip(
     const int H = frames.front().height;
     if (W == 0 || H == 0) return false;
 
-    const Config& cfg    = engine.GetConfig();
-    const int     fps    = 30;
-    const LONGLONG frame_dur = 10'000'000LL / fps;
-    const uint64_t base_ts  = frames.front().timestamp_100ns;
+    const Config& cfg     = engine.GetConfig();
+    const uint64_t base_ts = frames.front().timestamp_100ns;
+
+    // Derive the actual capture FPS from the frame timestamps. DXGI Desktop
+    // Duplication's delivery rate tracks the monitor refresh during active
+    // change, so this is typically 60/120/144 — not the 30 it used to be
+    // hard-coded to. Declaring the wrong rate to the encoder caused the
+    // output MP4's duration to disagree with the requested clip length.
+    int      fps     = 30;
+    LONGLONG avg_dur = 10'000'000LL / 30;
+    if (frames.size() >= 2) {
+        const uint64_t span = frames.back().timestamp_100ns - base_ts;
+        if (span > 0) {
+            avg_dur = (LONGLONG)(span / (frames.size() - 1));
+            const double measured = 10'000'000.0 / (double)avg_dur;
+            fps = (int)(measured + 0.5);
+            if (fps < 1)   fps = 1;
+            if (fps > 240) fps = 240;
+        }
+    }
 
     ComPtr<IMFAttributes> attrs;
     if (FAILED(MFCreateAttributes(attrs.GetAddressOf(), 4))) return false;
@@ -134,7 +151,8 @@ static bool WriteClip(
         const int uv_sz = W * (H / 2);
         std::vector<uint8_t> nv12(y_sz + uv_sz);
 
-        for (const auto& vf : frames) {
+        for (size_t i = 0; i < frames.size(); ++i) {
+            const auto& vf = frames[i];
             if (!vf.bgra || vf.bgra->empty()) continue;
 
             BgraToNv12(vf.bgra->data(),
@@ -152,11 +170,22 @@ static bool WriteClip(
             mbuf->Unlock();
             mbuf->SetCurrentLength((DWORD)nv12.size());
 
+            // Per-sample duration = gap to the next frame. The last frame
+            // can't see a next one, so it falls back to the average. Both
+            // SetSampleTime and SetSampleDuration use real timestamps so the
+            // output MP4's duration matches the captured wall-clock span.
+            LONGLONG this_dur = avg_dur;
+            if (i + 1 < frames.size()) {
+                LONGLONG gap = (LONGLONG)(frames[i + 1].timestamp_100ns
+                                          - vf.timestamp_100ns);
+                if (gap > 0) this_dur = gap;
+            }
+
             ComPtr<IMFSample> sample;
             MFCreateSample(sample.GetAddressOf());
             sample->AddBuffer(mbuf.Get());
             sample->SetSampleTime((LONGLONG)(vf.timestamp_100ns - base_ts));
-            sample->SetSampleDuration(frame_dur);
+            sample->SetSampleDuration(this_dur);
             writer->WriteSample(vid_stream, sample.Get());
         }
     }
@@ -248,12 +277,15 @@ void EncoderThread::EncoderLoop() {
 void EncoderThread::SaveClip() {
     const Config& cfg = engine_.GetConfig();
     const int     dur = cfg.duration_seconds;
-    const int     fps = 30;
 
     std::vector<VideoFrame>  vid_frames;
     std::vector<AudioPacket> loop_pkts, mic_pkts;
 
-    engine_.GetVideoRing().snapshot(vid_frames,  (size_t)(dur * fps + fps));
+    // Snapshot every frame currently in the ring — the ring is already sized
+    // to (duration + 2 s) by timestamp, and trim_vid below drops anything
+    // older than clip_start. Capping by frame count here would assume a
+    // fixed FPS and silently shorten clips on high-refresh-rate displays.
+    engine_.GetVideoRing().snapshot(vid_frames,  SIZE_MAX);
     engine_.GetLoopbackRing().snapshot(loop_pkts, (size_t)(dur * 200));
     engine_.GetMicRing().snapshot(mic_pkts,       (size_t)(dur * 200));
 

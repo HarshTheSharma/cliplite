@@ -49,6 +49,21 @@ public:
             out.push_back(buf_[i & (N - 1)]);
     }
 
+    // Invokes fn with a const reference to the oldest item while holding the
+    // snapshot lock. Returns false if the ring is empty or the lock is held
+    // (caller should retry). Used by the capture thread to read the oldest
+    // frame's timestamp before deciding whether to evict it.
+    template<typename Fn>
+    bool with_oldest(Fn&& fn) const {
+        std::unique_lock lk(snap_mu_, std::try_to_lock);
+        if (!lk) return false;
+        const size_t t = tail_.load(std::memory_order_relaxed);
+        const size_t h = head_.load(std::memory_order_relaxed);
+        if (t == h) return false;
+        fn(buf_[t & (N - 1)]);
+        return true;
+    }
+
     // frees the pool_ref in the oldest slot so the texture returns to the pool
     // try_to_lock so this never blocks the capture thread; retry next frame on false
     bool evict_oldest() {
