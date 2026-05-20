@@ -1,0 +1,23 @@
+{
+  "game_id": "fortnite",
+  "name": "Fortnite",
+  "log_paths": [
+    "%localappdata%/FortniteGame/Saved/Logs/FortniteGame.log"
+  ],
+  "_setup_note": "No game-side setup required. Epic rewrites FortniteGame.log each launch. ClipLite attaches at EOF so prior-session events are ignored.",
+  "events": [
+    {
+      "event": "kill",
+      "match": "Display.*Elimination|Display.*eliminated",
+      "regex": true,
+      "_note": "Fortnite logs elimination events under 'Display' verbosity. 'eliminated' appears in kill feed messages written by Kismet/Blueprint."
+    },
+    {
+      "event": "death",
+      "match": "Display.*knocked|Display.*YouDied|Display.*DownedByPlayer",
+      "regex": true
+    }
+  ],
+  "monitor_mode": "tail",
+  "poll_ms": 200
+}

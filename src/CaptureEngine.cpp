@@ -78,9 +78,8 @@ bool CaptureEngine::InitTexturePool() {
         }
     }
 
-    // 1-second margin so the ring doesn't run dry exactly at the configured duration; capped to avoid exhausting VRAM
-    const int fps       = 30;
-    const int pool_size = std::min(cfg_.duration_seconds * fps + fps, 9000);
+    // Two staging textures suffice: one in-flight CopyResource while the other is being read back.
+    const int pool_size = 2;
 
     pool_ = std::make_unique<TexturePool>();
     return pool_->Initialize(device_.Get(), w, h, pool_size);

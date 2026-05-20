@@ -1,0 +1,9 @@
+{
+  "game_id": "cs2",
+  "name": "Counter-Strike 2",
+  "_note": "CS2 kill/death detection is handled by Cs2GsiWatcher via Game State Integration, not log tailing. Copy configs/gamestate_integration_cliplite.cfg to: %steamapps%\\common\\Counter-Strike Global Offensive\\game\\csgo\\cfg\\",
+  "log_paths": [],
+  "events": [],
+  "monitor_mode": "tail",
+  "poll_ms": 5000
+}

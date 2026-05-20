@@ -1,0 +1,20 @@
+{
+  "game_id": "overwatch",
+  "name": "Overwatch 2",
+  "log_paths": [],
+  "_unavailable": "Blizzard does not expose a readable kill/death log for Overwatch 2. No log_paths are configured. This file is a placeholder — if a future game update or third-party tool produces a structured log, add its path here and tune the match strings.",
+  "events": [
+    {
+      "event": "kill",
+      "match": "eliminated",
+      "regex": false
+    },
+    {
+      "event": "death",
+      "match": "respawning",
+      "regex": false
+    }
+  ],
+  "monitor_mode": "tail",
+  "poll_ms": 200
+}

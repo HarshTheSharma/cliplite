@@ -60,12 +60,21 @@ int App::Run(HINSTANCE) {
 
     engine_->Start();
 
+    detector_ = std::make_unique<EventDetector>();
+    detector_->LoadConfigs();
+    // Future: wire clip engine once killfeed detection is integrated:
+    //   detector_->SetEventCallback([this](const EventData& d) {
+    //       if (d.event == "killfeed" && cfg_.clip_killfeed) engine_->RequestClipSave();
+    //   });
+    detector_->Start();
+
     WTL::CMessageLoop loop;
     _Module.AddMessageLoop(&loop);
     int ret = loop.Run();
     _Module.RemoveMessageLoop();
 
     UnregisterHotkey();
+    detector_.reset();
     engine_->Stop();
     cfg_.Save();
     tray_->Destroy();

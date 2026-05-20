@@ -6,7 +6,6 @@
 #include <mfreadwrite.h>
 #include <mferror.h>
 #include <wrl/client.h>
-#include <d3d11.h>
 #include <filesystem>
 #include <algorithm>
 #include <cstring>
@@ -63,9 +62,8 @@ static bool WriteClip(
 {
     if (frames.empty()) return false;
 
-    TexturePool* pool = engine.GetTexturePool();
-    if (!pool) return false;
-    const int W = pool->Width(), H = pool->Height();
+    const int W = frames.front().width;
+    const int H = frames.front().height;
     if (W == 0 || H == 0) return false;
 
     const Config& cfg    = engine.GetConfig();
@@ -137,26 +135,13 @@ static bool WriteClip(
         std::vector<uint8_t> nv12(y_sz + uv_sz);
 
         for (const auto& vf : frames) {
-            if (!vf.texture) continue;
+            if (!vf.bgra || vf.bgra->empty()) continue;
 
-            D3D11_MAPPED_SUBRESOURCE mapped{};
-            {
-                std::lock_guard lk(engine.GetContextMutex());
-                if (FAILED(engine.GetContext()->Map(vf.texture, 0,
-                                                     D3D11_MAP_READ, 0, &mapped)))
-                    continue;
-            }
-
-            BgraToNv12(static_cast<const uint8_t*>(mapped.pData),
-                       (int)mapped.RowPitch,
+            BgraToNv12(vf.bgra->data(),
+                       W * 4,          // no row padding — written tightly in CaptureFrame
                        nv12.data(), W,
                        nv12.data() + y_sz, W,
                        W, H);
-
-            {
-                std::lock_guard lk(engine.GetContextMutex());
-                engine.GetContext()->Unmap(vf.texture, 0);
-            }
 
             ComPtr<IMFMediaBuffer> mbuf;
             if (FAILED(MFCreateMemoryBuffer((DWORD)nv12.size(), mbuf.GetAddressOf())))
@@ -179,7 +164,8 @@ static bool WriteClip(
     {
         const uint64_t end_ts  = frames.back().timestamp_100ns;
         const uint64_t span    = (end_ts > base_ts) ? (end_ts - base_ts) : 0;
-        const size_t   n_samps = (size_t)(span * 48000ULL / 10'000'000ULL) + 48000;
+        // +1600: one video frame of audio slack so the last frame isn't cut short.
+        const size_t   n_samps = (size_t)(span * 48000ULL / 10'000'000ULL) + 1600;
 
         std::vector<int32_t> mix(n_samps * 2, 0);
 

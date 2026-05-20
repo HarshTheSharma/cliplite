@@ -1,6 +1,7 @@
 #include "VideoCapture.h"
 #include "CaptureEngine.h"
 #include <avrt.h>
+#include <cstring>
 #pragma comment(lib, "avrt.lib")
 
 static uint64_t Timestamp100ns() {
@@ -83,10 +84,8 @@ bool VideoCapture::CaptureFrame() {
 
     if (hr == DXGI_ERROR_WAIT_TIMEOUT) return true;  // no new frame; keep going
     if (hr == DXGI_ERROR_ACCESS_LOST)  return false; // need to recreate
-
     if (FAILED(hr)) { Sleep(1); return true; }
 
-    // RAII so ReleaseFrame runs on every return path, not just the happy one
     struct FrameGuard {
         IDXGIOutputDuplication* d;
         ~FrameGuard() { d->ReleaseFrame(); }
@@ -98,33 +97,55 @@ bool VideoCapture::CaptureFrame() {
 
     TexturePool* pool = engine_.GetTexturePool();
     if (!pool) return true;
+    const int W = pool->Width(), H = pool->Height();
 
-    // When pool is exhausted, evict the oldest ring frame so its texture is returned.
-    if (pool->FreeCount() == 0)
+    // Trim ring buffer to the configured clip duration.
+    const size_t max_frames = (size_t)(engine_.GetConfig().duration_seconds * 30 + 30);
+    if (engine_.GetVideoRing().size() >= max_frames)
         engine_.GetVideoRing().evict_oldest();
 
+    // Acquire one of the two readback staging textures.
     ID3D11Texture2D* staging = nullptr;
     auto pool_ref = pool->Acquire(staging);
-    if (!staging) return true; // pool still empty (encoder holding refs) → drop frame
+    if (!staging) {
+        // Both staging textures busy — wait one frame and retry once.
+        Sleep(1);
+        pool_ref = pool->Acquire(staging);
+        if (!staging) return true;
+    }
 
     {
-        // D3D11 immediate context is not thread-safe; encoder also calls Map on it
         std::lock_guard lk(engine_.GetContextMutex());
         D3D11_TEXTURE2D_DESC src_desc{}, dst_desc{};
         src_tex->GetDesc(&src_desc);
         staging->GetDesc(&dst_desc);
-
-        // Skip if resolutions differ (e.g. during a mode change).
         if (src_desc.Width != dst_desc.Width || src_desc.Height != dst_desc.Height)
             return true;
-
         engine_.GetContext()->CopyResource(staging, src_tex.Get());
     }
 
+    // Read back immediately to heap memory — avoids holding hundreds of staging textures.
+    auto pixels = std::make_shared<std::vector<uint8_t>>((size_t)W * H * 4);
+    {
+        std::lock_guard lk(engine_.GetContextMutex());
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if (FAILED(engine_.GetContext()->Map(staging, 0, D3D11_MAP_READ, 0, &mapped)))
+            return true;
+
+        const auto* src_row = static_cast<const uint8_t*>(mapped.pData);
+        uint8_t*    dst     = pixels->data();
+        for (int row = 0; row < H; ++row, src_row += mapped.RowPitch, dst += W * 4)
+            std::memcpy(dst, src_row, (size_t)W * 4);
+
+        engine_.GetContext()->Unmap(staging, 0);
+    }
+    // pool_ref dtor returns staging texture to the 2-texture pool.
+
     VideoFrame frame;
     frame.timestamp_100ns = Timestamp100ns();
-    frame.texture  = staging;
-    frame.pool_ref = std::move(pool_ref);
+    frame.width  = W;
+    frame.height = H;
+    frame.bgra   = std::move(pixels);
 
     engine_.GetVideoRing().push(std::move(frame));
     return true;
